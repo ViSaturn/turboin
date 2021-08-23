@@ -11,6 +11,15 @@ Then **READ THE INSTALL.SH FILE THROUGHLY** before running it like so
     chmod +x install.sh
     sudo ./install.sh
     
+# Usage
+To Run it:
+
+    has run
+
+And to Stop it:
+
+    has stop
+
 # Dependencies
 jezek's fork of xgbutil
 

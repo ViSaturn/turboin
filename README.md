@@ -1,15 +1,15 @@
 # turboin
 Hotkey creator for X
 # Installation
-First install go using your system's package manager, then clone the repository
+First install go using your system's package manager, then clone the repository anywhere on your operating system
 
     git clone https://github.com/ViSaturn/turboin
 
 Then **READ THE INSTALL.SH FILE THROUGHLY** before running it like so
 
     cd turboin
+    chmod +x install.sh
     sudo ./install.sh
-    cd ..
     
 # Dependencies
 jezek's fork of xgbutil

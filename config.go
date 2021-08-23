@@ -15,19 +15,20 @@ func setupModes() map[string]interface{} {
 	modes := map[string]interface{} {
 		// The default mode is the most important mode,
 		// without it, Turboin wont run
+
 		"default": map[string]interface{} {
 			// Normal Click Examples
 			"mod4-d": "dmenu_run",
 			"mod4-return": "termite",
 
-			// Double Click Examples
+			// Double Click Example
 			// First command is the command for one click
 			// Second command is the command for the double click
-			// "mod4-z": []interface{} {"mocp --volume +10", "mocp --volume -10"},
+			"mod4-c": []interface{} {"mocp --volume +10", "mocp --volume -10"},
 
-			// Special keys example
-			// Hold mod4 and z before also holding mod4-x
-			// "mod4-x": []interface{} {"rofi -show drun", "dmenu_run"},
+			// Special Keys Example
+			// Hold mod4 and z before also holding mod4-x to run this double click
+			// command set
 			"{mod4:z}-mod4-x": []interface{} {"mocp --unpause", "mocp --pause"},
 
 			// Switch your mode (does not work yet)
@@ -38,7 +39,6 @@ func setupModes() map[string]interface{} {
 			// Return to the previous mode
 			"mod4-z": "has mode default",
 
-			// Do the stuff
 			"mod4-d": "doom run",
 		}, // Make sure you have a comma at the end of every mode
 	}

@@ -30,8 +30,10 @@ you can create normal hotkeys and double click hotkeys where clicking a key
 twice quickly will run a different command than just clicking it once
 
 # Planned Features
-- Mode bindings, similiar to i3's
+- Mode bindings, similiar to i3's (almost complete)
 - Allow turboin to be ran as a daemon
+- Global keybindings that can be run regardless of mode
+- One keybinding for multiple commands
 
 # Example Configuration
 http://github.com/ViSaturn/turboin/blob/main/config.go

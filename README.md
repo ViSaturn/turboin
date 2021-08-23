@@ -14,11 +14,11 @@ Then **READ THE INSTALL.SH FILE THROUGHLY** before running it like so
 # Usage
 To Run it:
 
-    has run
+    turboin run
 
 And to Stop it:
 
-    has stop
+    turboin stop
 
 # Dependencies
 jezek's fork of xgbutil

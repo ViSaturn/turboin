@@ -2,4 +2,4 @@
 
 # Build & Copy program to /usr/bin
 go build
-mv has /usr/bin/
+mv turboin /usr/bin/

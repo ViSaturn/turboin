@@ -25,13 +25,15 @@ func run(currentMode string) {
 
 	// Recive runtime requests (e.g. change mode)
 
-
 	// Get the home directory
 	home, err := os.UserHomeDir()
 	if err != nil { panic(err) }
 
 	// Get config
 	modes := setupModes() // setupModes located in config.go
+
+	// Create specialFunc list for special keys to use
+	specialFuncs := map[string]interface{} {}
 
 	// Initialize Keybindings
 	keybinds.Initialize(X)
@@ -43,11 +45,81 @@ func run(currentMode string) {
 		str = replacer.Replace(str)
 
 		// Make readable to exec.Command,
-		// then invert to function & return
+		// then convert to function & return
 		splitStr := strings.Split(str, " ")
 		execString := func() { exec.Command(splitStr[0], splitStr[1:]...).Run() }
 
 		return execString
+	}
+
+	makeSpecialKeySet := func(specialKey string, normalKey string, doubleClick bool, doubleClickDelay int) {
+		// example:
+		// "{mod4:z}-mod4-x": func() { fmt.Println("mod4-z = special key, mod4-x = normal key") }
+
+		// Note that due to limitations the special key's seperator has to be different than
+		// the normal key's seperator
+		//
+		// the special key, when pressed, inserts the new function in specialFuncs, making it
+		// readable to linkConn a few lines down
+		// and when released, removes that function from specialFuncs no longer alowing it to
+		// be readable, however there is a bug. Say you press the special key, then the normal
+		// key and run rofi, for example and then you release the special key before exiting rofi
+		// while in rofi, for some reason key press/releases.. anything like that just stops
+		// working completely, so its not detected and even upon releasing the special key,
+		// the normal key still thinks it should use that function...
+		//
+		// The workaround here is to delete the specialFunc as soon as the normal key is pressed
+		// ( and before the run function runs ) this would be fine but it creates a new problem.
+		// The normal key can only be pressed again if the special key is also pressed again,
+		// but I think this is much better than the other problem we had before this workaround
+		//
+		// I could try to make a bug report to rofi about this but i don't know if it's a rofi
+		// problem or someting else, plus i think dmenu and other such tools may also have this
+		// issue so I think i'll try to figure a proper solution out myself
+
+		// Edit: Apparently sometimes even without anything happening releasing the key is
+		// not detected :/
+		// Right now only adds function specialFuncs for main function to run it
+
+		// Add function to specialFuncs map upon press
+		pressConn := keybinds.KeyPressFun(func(X *xgbutil.XUtil, e xevent.KeyPressEvent) {
+			specialFuncs[normalKey] = "can run"
+		})
+
+		// Remove function from specialFuncs map upon release
+		releaseConn := keybinds.KeyReleaseFun(func(X *xgbutil.XUtil, e xevent.KeyReleaseEvent) {
+			if run, ok := specialFuncs[normalKey]; ok {
+				delete(specialFuncs, normalKey)
+				fmt.Println(run) // FIXME
+			}
+		})
+
+		// Link to the normal key, when this is pressed the special key has to be pressed
+		// again for this to work again, because of limitations in xgbutil
+		linkConn := keybinds.KeyPressFun(func(X *xgbutil.XUtil, e xevent.KeyPressEvent) {
+			if canRun, ok := specialFuncs[normalKey]; ok {
+				go func() {
+					if doubleClick == true {
+						// 25 ms delay on top of double click delay to give time for it to
+						// run
+						time.Sleep(time.Duration(doubleClickDelay + 10) * time.Millisecond)
+					}
+
+					delete(specialFuncs, normalKey)
+					fmt.Println(canRun) // FIXME
+				}()
+			}
+		})
+
+		// Connect to bindings
+		errPress := pressConn.Connect(X, X.RootWin(), specialKey, true)
+		errRelease := releaseConn.Connect(X, X.RootWin(), specialKey, true)
+		errLink := linkConn.Connect(X, X.RootWin(), normalKey, true)
+
+		// Handle Errors
+		if errPress != nil { panic(errPress) }
+		if errRelease != nil { panic(errRelease) }
+		if errLink != nil { panic(errLink) }
 	}
 
 	// Cycle through modes & set the default if its there,
@@ -55,6 +127,8 @@ func run(currentMode string) {
 	// and setup all the keybindings
 	go func() {
 		for modeName, mode := range modes {
+			// when currentMode is passed to run it's already
+			// set to default
 			/*
 			if modeName == "default" {
 				currentMode = "default"
@@ -65,6 +139,36 @@ func run(currentMode string) {
 				// Attach settings will be changed depending on the command as the code executes
 				attachSettings := map[string]interface{} {
 					"doubleClick": false,
+						"doubleClickDelay": 190,
+					"specialKeySituation": false,
+						"specialKey": "",
+						"normalKey": "",
+				}
+
+				// Function to check if conditions are met to run the keybind's command
+				conditionsMet := func(run func(), currentMode string, modeName string) {
+					// checks whethr there is a special key situation, if there is
+					// it'll also check if it can run, if there is no special key situation
+					// it will check if something else has a special key situation with this
+					// key as a part of the set
+					if currentMode == modeName {
+						if attachSettings["specialKeySituation"].(bool) == true {
+							if canRun, ok := specialFuncs[attachSettings["normalKey"].(string)]; ok {
+								fmt.Println(canRun) // FIXME
+								go run()
+							}
+						} else {
+							go run()
+							// FIXME
+							/*
+							if canRun, ok := specialFuncs[attachSettings[keybind].(string)]; ok {
+								fmt.Println(canRun)
+							} else {
+								go run()
+							}
+							*/
+						}
+					}
 				}
 
 				// Get command the user is looking to run (from toRun)
@@ -102,10 +206,40 @@ func run(currentMode string) {
 					run = toRun.(func())
 				}
 
+				// Split keybind to take a look at each key (to look for special keys)
+				splitKeybind := strings.Split(keybind, "-") // seperator right now is -
+
+				for index, key := range splitKeybind {
+					if strings.HasPrefix(key, "{") && strings.HasSuffix(key, "}") {
+						// This means there is a special key situation that must be added
+						// to attachSettings
+						specialKey := strings.Replace(key, "{", "", 1) // remove prefix
+						specialKey = strings.Replace(specialKey, "}", "", 1) // remove suffix
+						specialKey = strings.Replace(specialKey, ":", "-", 1) // replace seperator
+
+						normalKey := strings.Replace(keybind, key + "-", "", 1) // remove special key from keybind
+
+						attachSettings["specialKeySituation"] = true
+						attachSettings["specialKey"] = specialKey
+						attachSettings["normalKey"] = normalKey
+
+						makeSpecialKeySet(specialKey, normalKey, attachSettings["doubleClick"].(bool), attachSettings["doubleClickDelay"].(int))
+
+						fmt.Println(index) // idk another way to stop the "index declared but not used", ill have to take
+						// a look into that
+					}
+				}
+
 				// Attach
 				alwaysModeName := modeName
 				timesSent := 0
 
+				// Minor Issue: the mode should be checked before running the whole thing
+				// rather than right before the command is executed, i'll add this after i'm done
+				// with other stuff since I don't want to add to much things at the same time
+				// and get confused
+
+				// Any other checks should be moved to the conditionsMet function
 				keybinds.KeyPressFun(func(X *xgbutil.XUtil, e xevent.KeyPressEvent) {
 					// Double Click Handler
 					if attachSettings["doubleClick"] == true {
@@ -113,7 +247,7 @@ func run(currentMode string) {
 							timesSent = timesSent + 1
 
 							go func() {
-								time.Sleep(190 * time.Millisecond)
+								time.Sleep(time.Duration(attachSettings["doubleClickDelay"].(int)) * time.Millisecond)
 
 								if timesSent > 1 { // Double Click:
 									timesSent = 0
@@ -125,19 +259,20 @@ func run(currentMode string) {
 								} else { // One Click:
 									// fmt.Println("one click")
 									timesSent = 0
-									if currentMode == alwaysModeName { go run() }
+									conditionsMet(run, currentMode, alwaysModeName)
 								}
 							}()
 						} else if timesSent == 1 {
 							timesSent = timesSent + 1
 							// fmt.Println("double click")
-							if currentMode == alwaysModeName { go run2() }
+							// If this is a special key situation and the special key is held
+							conditionsMet(run2, currentMode, alwaysModeName)
 						}
-						fmt.Println(timesSent)
 
 					// Normal Click Handler
 					} else {
-						if currentMode == alwaysModeName { go run() }
+						// If this is a special key situation and the special key is held
+						conditionsMet(run, currentMode, alwaysModeName)
 					}
 				}).Connect(X, X.RootWin(), keybind, true)
 			}
@@ -146,36 +281,11 @@ func run(currentMode string) {
 
 	// Start main event loop
 	xevent.Main(X)
-	/*
-	go xevent.Main(X)
-	fmt.Scanln()
-	*/
 }
-
-/*
-func restart(currentMode string) {
-	stop()
-	run(currentMode)
-}
-*/
-
-/*
-func switchMode(server *zmq.Socket, mode string) {
-	fmt.Println(mode)
-	fmt.Println(server)
-
-	server.Send(mode, 0)
-}
-*/
 
 // CLI Stuff
 func main() {
 	// Connect to server to send runtime requests
-	/*
-	zctx, _ := zmq.NewContext()
-	server, _ := zctx.NewSocket(zmq.REQ)
-	server.Connect("tcp://localhost:5005")
-	*/
 
 	// Variables
 	currentMode := "default"
@@ -200,7 +310,7 @@ func main() {
 		switch args[1] {
 		case "run": run(currentMode)
 		case "stop": exec.Command("killall", "turboin").Run()
-		case "mode": if arg2 != "" { /*server.Send(args[2], 1)*/ }
+		case "mode": if arg2 != "" {  }
 		}
 	}
 }

@@ -20,4 +20,6 @@ twice quickly will run a different command then when just clicking it once
 # Planned Features
 - Mode bindings, similiar to i3's
 - Allow turboin to be ran as a daemon
-    
+
+# Example Configuration
+http://github.com/ViSaturn/turboin/blob/main/config.go

@@ -34,6 +34,10 @@ twice quickly will run a different command than just clicking it once
 - Allow turboin to be ran as a daemon
 - Global keybindings that can be run regardless of mode
 - One keybinding for multiple commands
+- variables for your config (e.g. mod4: super)
+- settings for your cocnfig (e.g. seperator: " + ")
+- MacOS and Windows 7, 8 and 10 support
+- Improved installation process
 
 # Example Configuration
 http://github.com/ViSaturn/turboin/blob/main/config.go

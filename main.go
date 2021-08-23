@@ -9,7 +9,6 @@ import (
 	"os/exec"
 
 	// Keybinds
-	// "github.com/jezek/xgb/xproto"
 	"github.com/jezek/xgbutil"
 	keybinds "github.com/jezek/xgbutil/keybind"
 	"github.com/jezek/xgbutil/xevent"
@@ -54,27 +53,14 @@ func run(currentMode string) {
 		// Note that due to limitations the special key's seperator has to be different than
 		// the normal key's seperator
 
-		// the special key, when pressed, inserts the new function in specialFuncs, making it
-		// readable to linkConn a few lines down
-		// and when released, removes that function from specialFuncs no longer alowing it to
-		// be readable, however there is a bug. Say you press the special key, then the normal
-		// key and run rofi, for example and then you release the special key before exiting rofi
-		// while in rofi, for some reason key press/releases.. anything like that just stops
-		// working completely, so its not detected and even upon releasing the special key,
-		// the normal key still thinks it should use that function...
-
-		// The workaround here is to delete the specialFunc as soon as the normal key is pressed
-		// ( and before the run function runs ) this would be fine but it creates a new problem.
-		// The normal key can only be pressed again if the special key is also pressed again,
-		// but I think this is much better than the other problem we had before this workaround
-
-		// I could try to make a bug report to rofi about this but i don't know if it's a rofi
-		// problem or someting else, plus i think dmenu and other such tools may also have this
-		// issue so I think i'll try to figure a proper solution out myself
-
-		// Edit: Apparently sometimes even without anything happening releasing the key is
-		// not detected :/
-		// Right now only adds function specialFuncs for main function to run it
+		// How this works:
+		// pressConn and releaseConn place/remove the special key from the specials map
+		// when you press or release the special key on your keyboard
+		//
+		// while the special key is in the specials map it can be detected when linkConn
+		// is ran, linkConn is just there to remove the specialKey from the map in case
+		// releaseConn can't find it, the actual code checking the specials map is in the
+		// conditionsMet function
 
 		// Add function to specialFuncs map upon press
 		pressConn := keybinds.KeyPressFun(func(X *xgbutil.XUtil, e xevent.KeyPressEvent) {
@@ -95,9 +81,10 @@ func run(currentMode string) {
 			if _, ok := special[normalKey]; ok {
 				go func() {
 					if doubleClick == true {
-						// 25 ms delay on top of double click delay to give time for it to
-						// run
-						time.Sleep(time.Duration(doubleClickDelay + 10) * time.Millisecond)
+						// 5 ms window for the run function to detect the special key
+						// This is probably not the best way to do this but i'll probs find a
+						// better way later
+						time.Sleep(time.Duration(doubleClickDelay + 5) * time.Millisecond)
 					}
 					delete(special, normalKey)
 					_ = 1 // avoid "declared but not used"
@@ -145,23 +132,21 @@ func run(currentMode string) {
 					// it'll also check if it can run, if there is no special key situation
 					// it will check if something else has a special key situation with this
 					// key as a part of the set
-					if currentMode == modeName {
-						if attachSettings["specialKeySituation"].(bool) == true {
-							if _, ok := special[attachSettings["normalKey"].(string)]; ok {
-								go run()
-								_ = 1 // avoid "declared but not used"
-							}
+					if attachSettings["specialKeySituation"].(bool) == true {
+						if _, ok := special[attachSettings["normalKey"].(string)]; ok {
+							go run()
+							_ = 1 // avoid "declared but not used"
+						}
+					} else {
+						go run()
+						// FIXME
+						/*
+						if canRun, ok := specialFuncs[attachSettings[keybind].(string)]; ok {
+							fmt.Println(canRun)
 						} else {
 							go run()
-							// FIXME
-							/*
-							if canRun, ok := specialFuncs[attachSettings[keybind].(string)]; ok {
-								fmt.Println(canRun)
-							} else {
-								go run()
-							}
-							*/
 						}
+						*/
 					}
 				}
 
@@ -227,41 +212,39 @@ func run(currentMode string) {
 				alwaysModeName := modeName
 				timesSent := 0
 
-				// Minor Issue: the mode should be checked before running the whole thing
-				// rather than right before the command is executed, i'll add this after i'm done
-				// with other stuff since I don't want to add to much things at the same time
-				// and get confused
-
 				// Any other checks should be moved to the conditionsMet function
 				keybinds.KeyPressFun(func(X *xgbutil.XUtil, e xevent.KeyPressEvent) {
-					// Double Click Handler
-					if attachSettings["doubleClick"] == true {
-						if timesSent == 0 {
-							timesSent = timesSent + 1
+					// Check mode
+					if currentMode == alwaysModeName {
+						// Double Click Handler
+						if attachSettings["doubleClick"] == true {
+							if timesSent == 0 {
+								timesSent = timesSent + 1
 
-							go func() {
-								time.Sleep(time.Duration(attachSettings["doubleClickDelay"].(int)) * time.Millisecond)
+								go func() {
+									time.Sleep(time.Duration(attachSettings["doubleClickDelay"].(int)) * time.Millisecond)
 
-								if timesSent > 1 { // Double Click:
-									timesSent = 0
-									// this is just here to reset, the actual double click function
-									// runs a few lines down (the advantage to putting it there
-									// instead of here is to avoid the delay on running the double
-									// click function, however there is still no way to completely
-									// remove the delay for the one click function at the moment)
-								} else { // One Click:
-									timesSent = 0
-									conditionsMet(run, currentMode, alwaysModeName)
-								}
-							}()
-						} else if timesSent == 1 {
-							timesSent = timesSent + 1
-							conditionsMet(run2, currentMode, alwaysModeName)
+									if timesSent > 1 { // Double Click:
+										timesSent = 0
+										// this is just here to reset, the actual double click function
+										// runs a few lines down (the advantage to putting it there
+										// instead of here is to avoid the delay on running the double
+										// click function, however there is still no way to completely
+										// remove the delay for the one click function at the moment)
+									} else { // One Click:
+										timesSent = 0
+										conditionsMet(run, currentMode, alwaysModeName)
+									}
+								}()
+							} else if timesSent == 1 {
+								timesSent = timesSent + 1
+								conditionsMet(run2, currentMode, alwaysModeName)
+							}
+
+							// Normal Click Handler
+						} else {
+							conditionsMet(run, currentMode, alwaysModeName)
 						}
-
-					// Normal Click Handler
-					} else {
-						conditionsMet(run, currentMode, alwaysModeName)
 					}
 				}).Connect(X, X.RootWin(), keybind, true)
 			}

@@ -11,6 +11,9 @@ Then **READ THE INSTALL.SH FILE THROUGHLY** before running it like so
     sudo ./install.sh
     cd ..
     
+# Dependencies
+jezek's fork of xgbutil
+
 # Features
 Turboin is still in development and does not have all of it's
 planned features, but here are the current features but currently

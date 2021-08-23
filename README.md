@@ -1,5 +1,5 @@
 # turboin
-Hotkey creator for X
+Hotkey creator for X written in go
 # Installation
 First install go using your system's package manager, then clone the repository anywhere on your operating system
 

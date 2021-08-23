@@ -27,6 +27,8 @@ func run(currentMode string) {
 	modes := setupModes() // setupModes located in config.go
 
 	// Create special list for special keys to use
+	// TODO: I probably shouldnt use a map for this since I only need one value,
+	// not a key and a value
 	special := map[string]interface{} {}
 
 	// Initialize Keybindings
@@ -64,7 +66,7 @@ func run(currentMode string) {
 
 		// Add function to specialFuncs map upon press
 		pressConn := keybinds.KeyPressFun(func(X *xgbutil.XUtil, e xevent.KeyPressEvent) {
-			special[normalKey] = "can run"
+			special[normalKey] = ""
 		})
 
 		// Remove function from specialFuncs map upon release
@@ -201,6 +203,7 @@ func run(currentMode string) {
 						attachSettings["specialKeySituation"] = true
 						attachSettings["specialKey"] = specialKey
 						attachSettings["normalKey"] = normalKey
+						keybind = normalKey
 
 						makeSpecialKeySet(specialKey, normalKey, attachSettings["doubleClick"].(bool), attachSettings["doubleClickDelay"].(int))
 
@@ -257,8 +260,6 @@ func run(currentMode string) {
 
 // CLI Stuff
 func main() {
-	// Connect to server to send runtime requests
-
 	// Variables
 	currentMode := "default"
 

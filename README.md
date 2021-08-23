@@ -27,7 +27,7 @@ jezek's fork of xgbutil
 Turboin is still in development and does not have all of it's
 planned features, but here are the current features,
 you can create normal hotkeys and double click hotkeys where clicking a key
-twice quickly will run a different command then just clicking it once
+twice quickly will run a different command than just clicking it once
 
 # Planned Features
 - Mode bindings, similiar to i3's

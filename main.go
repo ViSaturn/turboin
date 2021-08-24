@@ -56,11 +56,11 @@ func run(currentMode string) {
 		// the normal key's seperator
 
 		// How this works:
-		// pressConn and releaseConn place/remove the special key from the specials map
+		// pressConn and releaseConn place/remove the normal key from the specials map
 		// when you press or release the special key on your keyboard
 		//
-		// while the special key is in the specials map it can be detected when linkConn
-		// is ran, linkConn is just there to remove the specialKey from the map in case
+		// while the normal key is in the specials map it can be detected when linkConn
+		// is ran, linkConn is just there to remove the normallKey from the map in case
 		// releaseConn can't find it, the actual code checking the specials map is in the
 		// conditionsMet function
 
@@ -105,51 +105,42 @@ func run(currentMode string) {
 		if errLink != nil { panic(errLink) }
 	}
 
+	// Function to check if conditions are met to run the keybind's command
+	conditionsMet := func(isSpecial bool, special map[string]interface{}, attachSettings map[string]interface{}, run func(), currentMode string, modeName string) {
+		// checks whethr there is a special key situation, if there is
+		// it'll also check if it can run, if there is no special key situation
+		// it will check if something else has a special key situation with this
+		// key as a part of the set
+		if isSpecial == true {
+			if _, ok := special[attachSettings["normalKey"].(string)]; ok {
+				go run()
+				_ = 1 // avoid "declared but not used"
+			}
+		} else {
+			go run()
+			// FIXME
+			/*
+			if canRun, ok := specialFuncs[attachSettings[keybind].(string)]; ok {
+				fmt.Println(canRun)
+			} else {
+				go run()
+			*/
+		}
+	}
+
 	// Cycle through modes & set the default if its there,
 	// after that, cycle through the mode's keybindings
 	// and setup all the keybindings
 	go func() {
 		for modeName, mode := range modes {
-			// when currentMode is passed to run it's already
-			// set to default
-			/*
-			if modeName == "default" {
-				currentMode = "default"
-			}
-			*/
-
 			for keybind, toRun := range mode.(map[string]interface{}) {
 				// Attach settings will be changed depending on the command as the code executes
 				attachSettings := map[string]interface{} {
 					"doubleClick": false,
 						"doubleClickDelay": 190,
-					"specialKeySituation": false,
+					"isSpecial": false,
 						"specialKey": "",
 						"normalKey": "",
-				}
-
-				// Function to check if conditions are met to run the keybind's command
-				conditionsMet := func(specialKeySituation bool, special map[string]interface{}, run func(), currentMode string, modeName string) {
-					// checks whethr there is a special key situation, if there is
-					// it'll also check if it can run, if there is no special key situation
-					// it will check if something else has a special key situation with this
-					// key as a part of the set
-					if specialKeySituation == true {
-						if _, ok := special[attachSettings["normalKey"].(string)]; ok {
-							go run()
-							_ = 1 // avoid "declared but not used"
-						}
-					} else {
-						go run()
-						// FIXME
-						/*
-						if canRun, ok := specialFuncs[attachSettings[keybind].(string)]; ok {
-							fmt.Println(canRun)
-						} else {
-							go run()
-						}
-						*/
-					}
 				}
 
 				// Get command the user is looking to run (from toRun)
@@ -200,7 +191,7 @@ func run(currentMode string) {
 
 						normalKey := strings.Replace(keybind, key + "-", "", 1) // remove special key from keybind
 
-						attachSettings["specialKeySituation"] = true
+						attachSettings["isSpecial"] = true
 						attachSettings["specialKey"] = specialKey
 						attachSettings["normalKey"] = normalKey
 						keybind = normalKey
@@ -222,7 +213,7 @@ func run(currentMode string) {
 						// Double Click Handler
 						if attachSettings["doubleClick"] == true {
 							if timesSent == 0 {
-								timesSent = timesSent + 1
+								timesSent++
 
 								go func() {
 									time.Sleep(time.Duration(attachSettings["doubleClickDelay"].(int)) * time.Millisecond)
@@ -236,17 +227,17 @@ func run(currentMode string) {
 										// remove the delay for the one click function at the moment)
 									} else { // One Click:
 										timesSent = 0
-										conditionsMet(attachSettings["specialKeySituation"].(bool), special, run, currentMode, alwaysModeName)
+										conditionsMet(attachSettings["isSpecial"].(bool), special, attachSettings, run, currentMode, alwaysModeName)
 									}
 								}()
 							} else if timesSent == 1 {
-								timesSent = timesSent + 1
-								conditionsMet(attachSettings["specialKeySituation"].(bool), special, run2, currentMode, alwaysModeName)
+								timesSent++
+								conditionsMet(attachSettings["isSpecial"].(bool), special, attachSettings, run2, currentMode, alwaysModeName)
 							}
 
 							// Normal Click Handler
 						} else {
-							conditionsMet(attachSettings["specialKeySituation"].(bool), special, run, currentMode, alwaysModeName)
+							conditionsMet(attachSettings["isSpecial"].(bool), special, attachSettings, run, currentMode, alwaysModeName)
 						}
 					}
 				}).Connect(X, X.RootWin(), keybind, true)
